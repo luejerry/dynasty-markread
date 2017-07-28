@@ -1,6 +1,8 @@
 // ==UserScript==
 // @name        Dynasty Mark IsRead
-// @namespace   dynasty-scans.com
+// @author      cyricc
+// @description Mark chapters that you have already read in Dynasty Scans chapter lists.
+// @namespace   https://dynasty-scans.com
 // @include     https://dynasty-scans.com/chapters/added*
 // @include     https://dynasty-scans.com/tags/*
 // @include     https://dynasty-scans.com/issues/*
