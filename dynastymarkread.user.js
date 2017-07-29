@@ -12,7 +12,7 @@
 // @include     https://dynasty-scans.com/authors/*
 // @include     https://dynasty-scans.com/pairings/*
 // @include     https://dynasty-scans.com/search*
-// @version     1.3
+// @version     1.4
 // @grant       none
 // ==/UserScript==
 
@@ -56,8 +56,7 @@
     var isReadMap = Array.from(isReadList)
       .map(dd => dd.getElementsByClassName("name")[0])
       .filter(a => typeof a !== "undefined")
-      .map(a => a.href)
-      .reduce((acc, href) => { acc[href] = true; return acc; }, {});
+      .reduce((acc, a) => { acc[a.href] = true; return acc; }, {});
 
     // Mark chapters on page that are Read
     var entryList = document.getElementsByTagName("dd");
