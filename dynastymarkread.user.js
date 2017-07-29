@@ -51,10 +51,7 @@
       .map(dd => dd.getElementsByClassName("name")[0])
       .filter(a => typeof a !== "undefined")
       .map(a => a.href)
-      .reduce((acc, href) => {
-        acc[href] = true;
-        return acc;
-      }, {});
+      .reduce((acc, href) => { acc[href] = true; return acc; }, {});
     var entryList = document.getElementsByTagName("dd");
     var entryLinks = Array.from(entryList)
       .map(dd => dd.getElementsByClassName("name")[0])
