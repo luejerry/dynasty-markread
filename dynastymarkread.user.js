@@ -12,7 +12,7 @@
 // @include     https://dynasty-scans.com/authors/*
 // @include     https://dynasty-scans.com/pairings/*
 // @include     https://dynasty-scans.com/search*
-// @version     1.2
+// @version     1.3
 // @grant       none
 // ==/UserScript==
 
@@ -25,7 +25,6 @@
       var xhttp = new XMLHttpRequest();
       xhttp.onload = () => {
         if (xhttp.status == 200) {
-//           console.log("Successful response from " + url);
           resolve(xhttp.responseXML);
         } else {
           reject(Error(xhttp.statusText));
@@ -34,18 +33,8 @@
       xhttp.open("GET", url);
       xhttp.responseType = "document";
       xhttp.send();
-//       console.log("GET: " + url)
     });
 
-  };
-
-  var scrapeIsRead = function(htmlDocument) {
-    var dropList = htmlDocument.getElementById("lists-dropdown").children;
-    var readElements = Array.from(dropList)
-      .map(e => e.children[0])
-      .filter(a => a.getAttribute("data-type") === "read")
-      .filter(a => a.getElementsByClassName("icon-remove").length > 0);
-    return readElements.length > 0;
   };
 
   var formatRead = function(element) {
@@ -68,7 +57,8 @@
       }, {});
     var entryList = document.getElementsByTagName("dd");
     var entryLinks = Array.from(entryList)
-      .map(dd => dd.getElementsByClassName("name")[0]);
+      .map(dd => dd.getElementsByClassName("name")[0])
+      .filter(a => typeof a !== "undefined");
     entryLinks.forEach(a => {
       if (readMap[a.href]) {
         formatRead(a);
