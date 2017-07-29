@@ -11,8 +11,10 @@
 // @include     https://dynasty-scans.com/series/*
 // @include     https://dynasty-scans.com/authors/*
 // @include     https://dynasty-scans.com/pairings/*
+// @include     https://dynasty-scans.com/scanlators/*
 // @include     https://dynasty-scans.com/search*
-// @version     1.4
+// @include     https://dynasty-scans.com/
+// @version     1.5
 // @grant       none
 // ==/UserScript==
 
@@ -40,7 +42,7 @@
 
   // Defines how Read links are styled
   const formatIsRead = function(element) {
-    element.classList.add("muted");
+    element.style.color="#999999";
   };
 
   // Main
@@ -55,17 +57,30 @@
     const isReadList = responseHtml.getElementsByTagName("dd");
     const isReadMap = Array.from(isReadList)
       .map(dd => dd.getElementsByClassName("name")[0])
-      .filter(a => typeof a !== "undefined")
+      .filter(a => a !== undefined)
       .reduce((acc, a) => { acc[a.href] = true; return acc; }, {});
 
     // Mark chapters on page that are Read
     const entryList = document.getElementsByTagName("dd");
     const entryLinks = Array.from(entryList)
       .map(dd => dd.getElementsByClassName("name")[0])
-      .filter(a => typeof a !== "undefined");
+      .filter(a => a !== undefined);
     entryLinks
       .filter(a => isReadMap[a.href])
       .forEach(a => formatIsRead(a));
+
+    const thumbnailList = Array.from(document.getElementsByClassName("thumbnail"));
+    const thumbnailLinks = thumbnailList
+      .filter(e => e.tagName === "A")
+      .filter(a => isReadMap[a.href]);
+    thumbnailLinks
+      .map(a => a.getElementsByClassName("title")[0])
+      .filter(div => div !== undefined)
+      .forEach(div => formatIsRead(div));
+    thumbnailLinks
+      .map(a => a.getElementsByClassName("caption")[0])
+      .filter(div => div !== undefined)
+      .forEach(div => formatIsRead(div));
   });
 
 })();
