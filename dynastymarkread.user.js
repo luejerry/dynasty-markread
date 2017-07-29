@@ -71,8 +71,8 @@
       .forEach(a => formatIsRead(a));
 
     // Mark chapter cards on page that are Read
-    const thumbnailList = Array.from(document.getElementsByClassName("thumbnail"));
-    const thumbnailLinks = thumbnailList
+    const thumbnailList = document.getElementsByClassName("thumbnail");
+    const thumbnailLinks = Array.from(thumbnailList)
       .filter(e => e.tagName === "A")
       .filter(a => isReadMap[a.href]);
     thumbnailLinks
