@@ -14,6 +14,7 @@
 // @include     https://dynasty-scans.com/scanlators/*
 // @include     https://dynasty-scans.com/search*
 // @include     https://dynasty-scans.com/
+// @include     https://dynasty-scans.com/?*
 // @version     1.5
 // @grant       none
 // ==/UserScript==
