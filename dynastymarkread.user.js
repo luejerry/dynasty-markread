@@ -11,7 +11,8 @@
 // @include     https://dynasty-scans.com/series/*
 // @include     https://dynasty-scans.com/authors/*
 // @include     https://dynasty-scans.com/pairings/*
-// @version     1.1
+// @include     https://dynasty-scans.com/search*
+// @version     1.2
 // @grant       none
 // ==/UserScript==
 
