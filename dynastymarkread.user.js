@@ -63,10 +63,9 @@
     const entryLinks = Array.from(entryList)
       .map(dd => dd.getElementsByClassName("name")[0])
       .filter(a => typeof a !== "undefined");
-    entryLinks.forEach(a => {
-      if (isReadMap[a.href]) {
-        formatIsRead(a);
-      }
+    entryLinks
+      .filter(a => isReadMap[a.href])
+      .forEach(formatIsRead);
     });
   });
 
