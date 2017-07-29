@@ -43,7 +43,7 @@
 
   // Defines how Read links are styled
   const formatIsRead = function(element) {
-    element.style.color="#999999";
+    element.style.color = "#999999";
   };
 
   // Main
