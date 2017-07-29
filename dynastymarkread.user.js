@@ -61,7 +61,7 @@
       .filter(a => a !== undefined)
       .reduce((acc, a) => { acc[a.href] = true; return acc; }, {});
 
-    // Mark chapters on page that are Read
+    // Mark chapter links on page that are Read
     const entryList = document.getElementsByTagName("dd");
     const entryLinks = Array.from(entryList)
       .map(dd => dd.getElementsByClassName("name")[0])
@@ -70,6 +70,7 @@
       .filter(a => isReadMap[a.href])
       .forEach(a => formatIsRead(a));
 
+    // Mark chapter cards on page that are Read
     const thumbnailList = Array.from(document.getElementsByClassName("thumbnail"));
     const thumbnailLinks = thumbnailList
       .filter(e => e.tagName === "A")
