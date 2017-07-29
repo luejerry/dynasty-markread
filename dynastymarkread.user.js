@@ -20,6 +20,7 @@
   console.log("Running Dynasty-IsRead user script.");
 
   var listHref = "https://dynasty-scans.com/lists";
+
   var httpGet = function(url) {
     return new Promise((resolve, reject) => {
       var xhttp = new XMLHttpRequest();
@@ -34,7 +35,6 @@
       xhttp.responseType = "document";
       xhttp.send();
     });
-
   };
 
   var formatRead = function(element) {
