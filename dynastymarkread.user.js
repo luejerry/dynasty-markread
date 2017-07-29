@@ -66,7 +66,6 @@
     entryLinks
       .filter(a => isReadMap[a.href])
       .forEach(formatIsRead);
-    });
   });
 
 })();
