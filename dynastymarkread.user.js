@@ -37,17 +37,17 @@
     });
   };
 
-  var formatRead = function(element) {
+  var formatIsRead = function(element) {
     element.classList.add("muted");
   };
 
   httpGet(listHref).then(responseHtml => {
     var listLinks = responseHtml.getElementsByClassName("table-link");
-    var readHref = Array.from(listLinks).find(a => a.innerText === "Read").href;
-    return httpGet(readHref);
+    var isReadHref = Array.from(listLinks).find(a => a.innerText === "Read").href;
+    return httpGet(isReadHref);
   }).then(responseHtml => {
-    var chapterList = responseHtml.getElementsByTagName("dd");
-    var readMap = Array.from(chapterList)
+    var isReadList = responseHtml.getElementsByTagName("dd");
+    var isReadMap = Array.from(isReadList)
       .map(dd => dd.getElementsByClassName("name")[0])
       .filter(a => typeof a !== "undefined")
       .map(a => a.href)
@@ -57,8 +57,8 @@
       .map(dd => dd.getElementsByClassName("name")[0])
       .filter(a => typeof a !== "undefined");
     entryLinks.forEach(a => {
-      if (readMap[a.href]) {
-        formatRead(a);
+      if (isReadMap[a.href]) {
+        formatIsRead(a);
       }
     });
   });
