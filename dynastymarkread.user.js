@@ -65,7 +65,7 @@
       .filter(a => typeof a !== "undefined");
     entryLinks
       .filter(a => isReadMap[a.href])
-      .forEach(formatIsRead);
+      .forEach(a => formatIsRead(a));
   });
 
 })();
