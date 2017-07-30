@@ -70,10 +70,10 @@
 
   /* Check and mark an individual thumbnail caption if Read */
   const markThumbnailIsRead = function (a) {
+    const titleDiv = a.getElementsByClassName("title")[0] || a.getElementsByClassName("caption")[0];
     httpGet(a.href).then(responseHtml => {
       if (scrapeIsRead(responseHtml)) {
-        const titles = [...a.getElementsByClassName("title"), ...a.getElementsByClassName("caption")];
-        titles.forEach(div => formatIsRead(div));
+        formatIsRead(titleDiv);
       }
     });
   };
@@ -97,7 +97,9 @@
     .map(dd => dd.getElementsByClassName("name")[0])
     .filter(a => a !== undefined);
   const thumbnailList = Array.from(document.getElementsByClassName("thumbnail"));
-  const thumbnailLinks = thumbnailList.filter(e => e.tagName === "A");
+  const thumbnailLinks = thumbnailList
+    .filter(e => e.tagName === "A")
+    .filter(a => a.getElementsByClassName("title")[0] || a.getElementsByClassName("caption")[0]);
 
   // Select an algorithm based on the number of chapter links found.
   // Below a certain threshold, it is faster to scrape Read status from each individual chapter page.
