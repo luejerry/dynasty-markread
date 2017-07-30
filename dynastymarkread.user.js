@@ -61,7 +61,7 @@
 
   /* Check and mark an individual link if Read */
   const markLinkIsRead = function (a) {
-    httpGet(a.href).then(responseHtml => {
+    return httpGet(a.href).then(responseHtml => {
       if (scrapeIsRead(responseHtml)) {
         formatIsRead(a);
       }
@@ -71,7 +71,7 @@
   /* Check and mark an individual thumbnail caption if Read */
   const markThumbnailIsRead = function (a) {
     const titleDiv = a.getElementsByClassName("title")[0] || a.getElementsByClassName("caption")[0];
-    httpGet(a.href).then(responseHtml => {
+    return httpGet(a.href).then(responseHtml => {
       if (scrapeIsRead(responseHtml)) {
         formatIsRead(titleDiv);
       }
