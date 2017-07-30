@@ -23,9 +23,11 @@
   console.log("Running Dynasty-IsRead user script.");
 
   const listHref = "https://dynasty-scans.com/lists";
+
+  /* Minimum number of chapters on page needed to trigger a batch fetch */
   const entryThreshold = 30;
 
-  // Promisify XMLHttpRequest
+  /* Promisify XMLHttpRequest */
   const httpGet = function (url) {
     return new Promise((resolve, reject) => {
       const xhttp = new XMLHttpRequest();
@@ -42,7 +44,7 @@
     });
   };
 
-  // Check if an individual chapter is Read
+  /* Check if an individual chapter is Read */
   const scrapeIsRead = function (htmlDocument) {
     var dropList = htmlDocument.getElementById("lists-dropdown").children;
     var readElements = Array.from(dropList)
@@ -52,12 +54,12 @@
     return readElements.length > 0;
   };
 
-  // Defines how Read links are styled
+  /* Apply style to Read link or caption */
   const formatIsRead = function (element) {
     element.style.color = "#999999";
   };
 
-  // Check and mark an individual chapter if Read
+  /* Check and mark an individual link if Read */
   const markLinkIsRead = function (a) {
     httpGet(a.href).then(responseHtml => {
       if (scrapeIsRead(responseHtml)) {
@@ -66,7 +68,7 @@
     });
   };
 
-  // Check and mark an individual chapter thumbnail if Read
+  /* Check and mark an individual thumbnail caption if Read */
   const markThumbnailIsRead = function (a) {
     httpGet(a.href).then(responseHtml => {
       if (scrapeIsRead(responseHtml)) {
@@ -76,8 +78,20 @@
     });
   };
 
-  // Main
+  /* Promise to fetch the user's Read list and return it as a lookup table */
+  const promiseIsReadMap = function(isReadHref) {
+    return httpGet(isReadHref).then(responseHtml => {
+      const isReadList = responseHtml.getElementsByTagName("dd");
+      return Array.from(isReadList)
+        .map(dd => dd.getElementsByClassName("name")[0])
+        .filter(a => a !== undefined)
+        .reduce((acc, a) => { acc[a.href] = true; return acc; }, {});
+    });
+  };
 
+  /* Main */
+
+  // Find all links to chapters on the page
   const entryList = document.getElementsByTagName("dd");
   const entryLinks = Array.from(entryList)
     .map(dd => dd.getElementsByClassName("name")[0])
@@ -85,6 +99,10 @@
   const thumbnailList = Array.from(document.getElementsByClassName("thumbnail"));
   const thumbnailLinks = thumbnailList.filter(e => e.tagName === "A");
 
+  // Select an algorithm based on the number of chapter links found.
+  // Below a certain threshold, it is faster to scrape Read status from each individual chapter page.
+  // Above that threshold, it is faster to request the user's entire Read list.
+  // If above threshold, both methods are used concurrently to reduce perceived latency to the user.
   if (entryLinks.length + thumbnailLinks.length < entryThreshold) {
     console.log(`Dynasty-IsRead: Less than ${entryThreshold} chapters on page, using serial fetch only`);
     entryLinks.forEach(a => markLinkIsRead(a));
@@ -95,19 +113,12 @@
       // GET the user's Read list (the url is different for each user)
       const listLinks = responseHtml.getElementsByClassName("table-link");
       const isReadHref = Array.from(listLinks).find(a => a.innerText === "Read").href;
-      const fetchIsRead = httpGet(isReadHref);
+      const fetchIsReadMap = promiseIsReadMap(isReadHref);
       // Start checking and marking individual chapters while waiting on Read list
       entryLinks.slice(0, entryThreshold).forEach(a => markLinkIsRead(a));
       thumbnailLinks.slice(0, entryThreshold).forEach(a => markThumbnailIsRead(a));
-      return fetchIsRead;
-    }).then(responseHtml => {
-      // Store all the user's Read chapters in a lookup map
-      const isReadList = responseHtml.getElementsByTagName("dd");
-      const isReadMap = Array.from(isReadList)
-        .map(dd => dd.getElementsByClassName("name")[0])
-        .filter(a => a !== undefined)
-        .reduce((acc, a) => { acc[a.href] = true; return acc; }, {});
-
+      return fetchIsReadMap;
+    }).then(isReadMap => {
       // Mark chapters on page that are Read
       entryLinks
         .filter(a => isReadMap[a.href])
