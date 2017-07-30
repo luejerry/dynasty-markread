@@ -15,7 +15,7 @@
 // @include     https://dynasty-scans.com/search*
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
-// @version     1.6
+// @version     1.7
 // @grant       none
 // ==/UserScript==
 
