@@ -22,7 +22,7 @@
   console.log("Running Dynasty-IsRead user script.");
 
   const listHref = "https://dynasty-scans.com/lists";
-  const entryThreshold = 20;
+  const entryThreshold = 30;
 
   // Promisify XMLHttpRequest
   const httpGet = function (url) {
