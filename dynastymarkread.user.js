@@ -65,6 +65,7 @@
       if (scrapeIsRead(responseHtml)) {
         formatIsRead(a);
       }
+      return Promise.resolve();
     });
   };
 
@@ -75,6 +76,7 @@
       if (scrapeIsRead(responseHtml)) {
         formatIsRead(titleDiv);
       }
+      return Promise.resolve();
     });
   };
 
@@ -107,8 +109,11 @@
   // If above threshold, both methods are used concurrently to reduce perceived latency to the user.
   if (entryLinks.length + thumbnailLinks.length < entryThreshold) {
     console.log(`Dynasty-IsRead: Less than ${entryThreshold} chapters on page, using serial fetch only`);
-    entryLinks.forEach(a => markLinkIsRead(a));
-    thumbnailLinks.forEach(a => markThumbnailIsRead(a));
+    const markLinkPromises = entryLinks.map(a => markLinkIsRead(a));
+    const markThumbnailPromises = thumbnailLinks.map(a => markThumbnailIsRead(a));
+    Promise.all([...markLinkPromises, ...markThumbnailPromises]).then(() => {
+      console.log(`Dynasty-IsRead: finished marking ${entryLinks.length + thumbnailLinks.length} chapters.`);
+    });
   } else {
     console.log(`Dynasty-IsRead: ${entryLinks.length + thumbnailLinks.length} chapters, using hybrid batch fetch`);
     httpGet(listHref).then(responseHtml => {
@@ -135,6 +140,9 @@
         .map(a => a.getElementsByClassName("caption")[0])
         .filter(div => div !== undefined)
         .forEach(div => formatIsRead(div));
+      return Promise.resolve();
+    }).then(() => {
+      console.log(`Dynasty-IsRead: finished marking ${entryLinks.length + thumbnailLinks.length} chapters.`);
     }).catch(error => {
       console.log(`Dynasty-IsRead: ${error.name} occurred during batch fetch: ${error.message}`);
     });
