@@ -132,12 +132,7 @@
         .forEach(a => formatIsRead(a));
       thumbnailLinks
         .filter(a => isReadMap[a.href])
-        .map(a => a.getElementsByClassName("title")[0])
-        .filter(div => div !== undefined)
-        .forEach(div => formatIsRead(div));
-      thumbnailLinks
-        .filter(a => isReadMap[a.href])
-        .map(a => a.getElementsByClassName("caption")[0])
+        .map(a => a.getElementsByClassName("title")[0] || a.getElementsByClassName("caption")[0])
         .filter(div => div !== undefined)
         .forEach(div => formatIsRead(div));
       return Promise.resolve();
