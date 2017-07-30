@@ -133,6 +133,8 @@
         .map(a => a.getElementsByClassName("caption")[0])
         .filter(div => div !== undefined)
         .forEach(div => formatIsRead(div));
+    }).catch(error => {
+      console.log(`Dynasty-IsRead: ${error.name} occurred during batch fetch: ${error.message}`);
     });
   }
 })();
