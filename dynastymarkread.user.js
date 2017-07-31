@@ -21,6 +21,8 @@
 
 (function () {
   console.log("Running Dynasty-IsRead user script.");
+  
+  const timeStart = performance.now();
 
   const listHref = "https://dynasty-scans.com/lists";
 
@@ -102,20 +104,22 @@
   const thumbnailLinks = thumbnailList
     .filter(e => e.tagName === "A")
     .filter(a => a.getElementsByClassName("title")[0] || a.getElementsByClassName("caption")[0]);
+  const numLinks = entryLinks.length + thumbnailLinks.length;
 
   // Select an algorithm based on the number of chapter links found.
   // Below a certain threshold, it is faster to scrape Read status from each individual chapter page.
   // Above that threshold, it is faster to request the user's entire Read list.
   // If above threshold, both methods are used concurrently to reduce perceived latency to the user.
-  if (entryLinks.length + thumbnailLinks.length < entryThreshold) {
+  if (numLinks < entryThreshold) {
     console.log(`Dynasty-IsRead: Less than ${entryThreshold} chapters on page, using serial fetch only`);
     const markLinkPromises = entryLinks.map(a => markLinkIsRead(a));
     const markThumbnailPromises = thumbnailLinks.map(a => markThumbnailIsRead(a));
     Promise.all([...markLinkPromises, ...markThumbnailPromises]).then(() => {
-      console.log(`Dynasty-IsRead: finished marking ${entryLinks.length + thumbnailLinks.length} chapters.`);
+      const timeDeltaMillis = performance.now() - timeStart;
+      console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis} ms.`);
     });
   } else {
-    console.log(`Dynasty-IsRead: ${entryLinks.length + thumbnailLinks.length} chapters, using hybrid batch fetch`);
+    console.log(`Dynasty-IsRead: ${numLinks} chapters, using hybrid batch fetch`);
     httpGet(listHref).then(responseHtml => {
       // GET the user's Read list (the url is different for each user)
       const listLinks = responseHtml.getElementsByClassName("table-link");
@@ -137,7 +141,8 @@
         .forEach(div => formatIsRead(div));
       return Promise.resolve();
     }).then(() => {
-      console.log(`Dynasty-IsRead: finished marking ${entryLinks.length + thumbnailLinks.length} chapters.`);
+      const timeDeltaMillis = performance.now() - timeStart;
+      console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis} ms.`);
     }).catch(error => {
       console.log(`Dynasty-IsRead: ${error.name} occurred during batch fetch: ${error.message}`);
     });
