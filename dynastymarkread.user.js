@@ -15,7 +15,7 @@
 // @include     https://dynasty-scans.com/search*
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
-// @version     1.8
+// @version     1.9
 // @grant       none
 // ==/UserScript==
 
@@ -112,16 +112,16 @@
     .filter(a => a.getElementsByClassName("title")[0] || a.getElementsByClassName("caption")[0]);
   const numLinks = entryLinks.length + thumbnailLinks.length;
 
-  // Select an algorithm based on the number of chapter links found.
+  // Run algorithm based on the number of chapter links found.
   // Below a certain threshold, it is faster to scrape Read status from each individual chapter page.
   // Above that threshold, it is faster to request the user's entire Read list.
-  // If above threshold, both methods are used concurrently to reduce perceived latency to the user.
+  // If above threshold, both methods are used concurrently to improve perceived responsiveness.
   if (numLinks < entryThreshold) {
     console.log(`Dynasty-IsRead: Less than ${entryThreshold} chapters on page, using serial fetch only`);
     promiseMarkIndividualLinks(entryLinks, thumbnailLinks).then(promises => {
       const timeDeltaMillis = performance.now() - timeStart;
       console.log(`Dynasty-IsRead: finished marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
-    });
+    }).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during marking: ${error.message}`));
   } else {
     console.log(`Dynasty-IsRead: ${numLinks} chapters, using hybrid batch fetch`);
     httpGet(listHref).then(responseHtml => {
@@ -133,7 +133,7 @@
       promiseMarkIndividualLinks(entryLinks.slice(0, entryThreshold), thumbnailLinks.slice(0, entryThreshold)).then(promises => {
         const timeDeltaMillis = performance.now() - timeStart;
         console.log(`Dynasty-IsRead: finished pre-marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
-      });
+      }).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during pre-marking: ${error.message}`));
       return fetchIsReadMap;
     }).then(isReadMap => {
       // Mark chapters on page that are Read
