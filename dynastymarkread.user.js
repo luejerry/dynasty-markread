@@ -96,7 +96,7 @@
   const promiseMarkIndividualLinks = function(entryLinks, thumbnailLinks) {
     const markLinkPromises = entryLinks.map(a => markLinkIsRead(a));
     const markThumbnailPromises = thumbnailLinks.map(a => markThumbnailIsRead(a));
-    return Promise.all([...markLinkPromises, ...markthumbnailPromises]);
+    return Promise.all([...markLinkPromises, ...markThumbnailPromises]);
   };
 
   /* Main */
