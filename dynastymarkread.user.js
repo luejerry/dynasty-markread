@@ -132,7 +132,7 @@
       // Start checking and marking individual chapters while waiting on Read list
       promiseMarkIndividualLinks(entryLinks.slice(0, entryThreshold), thumbnailLinks.slice(0, entryThreshold)).then(promises => {
         const timeDeltaMillis = performance.now() - timeStart;
-        console.log(`Dynasty-IsRead: marked ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms with parallel fetch`);
+        console.log(`Dynasty-IsRead: finished pre-marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
       });
       return fetchIsReadMap;
     }).then(isReadMap => {
