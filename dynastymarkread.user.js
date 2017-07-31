@@ -92,6 +92,12 @@
         .reduce((acc, a) => { acc[a.href] = true; return acc; }, {});
     });
   };
+  
+  const promiseMarkIndividualLinks = function(entryLinks, thumbnailLinks) {
+    const markLinkPromises = entryLinks.map(a => markLinkIsRead(a));
+    const markThumbnailPromises = thumbnailLinks.map(a => markThumbnailIsRead(a));
+    return Promise.all([...markLinkPromises, ...markthumbnailPromises]);
+  };
 
   /* Main */
 
@@ -112,11 +118,9 @@
   // If above threshold, both methods are used concurrently to reduce perceived latency to the user.
   if (numLinks < entryThreshold) {
     console.log(`Dynasty-IsRead: Less than ${entryThreshold} chapters on page, using serial fetch only`);
-    const markLinkPromises = entryLinks.map(a => markLinkIsRead(a));
-    const markThumbnailPromises = thumbnailLinks.map(a => markThumbnailIsRead(a));
-    Promise.all([...markLinkPromises, ...markThumbnailPromises]).then(() => {
+    promiseMarkIndividualLinks(entryLinks, thumbnailLinks).then(promises => {
       const timeDeltaMillis = performance.now() - timeStart;
-      console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis.toFixed()} ms.`);
+      console.log(`Dynasty-IsRead: finished marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
     });
   } else {
     console.log(`Dynasty-IsRead: ${numLinks} chapters, using hybrid batch fetch`);
@@ -126,8 +130,10 @@
       const isReadHref = Array.from(listLinks).find(a => a.innerText === "Read").href;
       const fetchIsReadMap = promiseIsReadMap(isReadHref);
       // Start checking and marking individual chapters while waiting on Read list
-      entryLinks.slice(0, entryThreshold).forEach(a => markLinkIsRead(a));
-      thumbnailLinks.slice(0, entryThreshold).forEach(a => markThumbnailIsRead(a));
+      promiseMarkIndividualLinks(entryLinks.slice(0, entryThreshold), thumbnailLinks.slice(0, entryThreshold)).then(promises => {
+        const timeDeltaMillis = performance.now() - timeStart;
+        console.log(`Dynasty-IsRead: marked ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms with parallel fetch`);
+      });
       return fetchIsReadMap;
     }).then(isReadMap => {
       // Mark chapters on page that are Read
