@@ -116,7 +116,7 @@
     const markThumbnailPromises = thumbnailLinks.map(a => markThumbnailIsRead(a));
     Promise.all([...markLinkPromises, ...markThumbnailPromises]).then(() => {
       const timeDeltaMillis = performance.now() - timeStart;
-      console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis} ms.`);
+      console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis.toFixed()} ms.`);
     });
   } else {
     console.log(`Dynasty-IsRead: ${numLinks} chapters, using hybrid batch fetch`);
@@ -142,7 +142,7 @@
       return Promise.resolve();
     }).then(() => {
       const timeDeltaMillis = performance.now() - timeStart;
-      console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis} ms.`);
+      console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis.toFixed()} ms.`);
     }).catch(error => {
       console.log(`Dynasty-IsRead: ${error.name} occurred during batch fetch: ${error.message}`);
     });
