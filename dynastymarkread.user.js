@@ -17,6 +17,8 @@
 // @include     https://dynasty-scans.com/?*
 // @version     2.0
 // @grant       none
+// @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
+// @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // ==/UserScript==
 
 (function () {
