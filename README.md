@@ -1,8 +1,9 @@
 # Dynasty Mark Read
 
-This userscript greys out chapters in your Read list on all site views.
+This userscript visually marks chapters in your Read and To Read lists on all site views.
 
 ## Changelog
+* 2.1: now enabled for list views. Chapters on To Read list now marked in blue.
 * 2.0: implement caching for significant performance improvement and removed perf logging.
 * 1.9: output performance stats to console. Refactor to better adhere to ES6 best practices.
 * 1.8: improved performance by skipping checking links with no text (e.g. image links).
