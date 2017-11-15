@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.1
+// @version     2.2
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -49,10 +49,33 @@
     });
   };
 
+  /* Defines statuses to mark. `status` and `display` fields must match identifiers on the site */
+  const statusMaps = [
+    {
+      id: 'isReadMap',
+      status: 'read',
+      display: 'Read',
+      table: {}
+    },
+    {
+      id: 'toReadMap',
+      status: 'to_read',
+      display: 'To Read',
+      table: {}
+    },
+    {
+      id: 'subscribedMap',
+      status: 'subscribed',
+      display: 'Subscribed',
+      table: {}
+    }
+  ];
+
   /* Defines status ids and link formatter functions */
   const statusFormatters = {
     read: element => element.style.color = '#999999',
-    to_read: element => element.style.color = '#3a87ad'
+    to_read: element => element.style.color = '#3a87ad',
+    subscribed: element => element.style.color = '#ad1457'
   };
 
   /* Returns list of statuses of a chapter that match those defined in statusFormatters */
@@ -118,13 +141,15 @@
   };
 
   /* Batch mark all links on page from a cached map in local storage, if it exists */
-  const markFromCache = function (statusMapId, formatter) {
-    const cachedMap = JSON.parse(localStorage.getItem(statusMapId));
-    if (cachedMap) {
-      batchMark(cachedMap, formatter);
-      return cachedMap;
-    }
-    return {};
+  const markAllFromCache = function (statusObjs) {
+    return statusObjs.map(statusObj => {
+      const cachedMap = JSON.parse(localStorage.getItem(statusObj.id));
+      if (cachedMap) {
+        batchMark(cachedMap, statusFormatters[statusObj.status]);
+        return cachedMap;
+      }
+      return {};
+    });
   };
 
   /* Main */
@@ -140,50 +165,38 @@
     .filter(a => a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0]);
   const numLinks = entryLinks.length + thumbnailLinks.length;
 
-  // Immediately mark if cached lists are available
-  const cachedIsRead = markFromCache('isReadMap', statusFormatters.read);
-  const cachedToRead = markFromCache('toReadMap', statusFormatters.to_read);
+  const cachedMaps = markAllFromCache(statusMaps);
 
   // Run algorithm based on the number of chapter links found.
   // Below a certain threshold, it is faster to scrape Read status from each individual chapter page.
   // Above that threshold, it is faster to request the user's entire Read list.
   // If above threshold, both methods are used concurrently to improve perceived responsiveness.
   if (numLinks < entryThreshold) {
-    // console.log(`Dynasty-IsRead: Less than ${entryThreshold} chapters on page, using serial fetch only`);
-    promiseMarkIndividualLinks(entryLinks, thumbnailLinks, Object.assign({}, cachedToRead, cachedIsRead)).then(promises => {
-      // const timeDeltaMillis = performance.now() - timeStart;
-      // console.log(`Dynasty-IsRead: finished marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
-    }).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during marking: ${error.message}`));
+    promiseMarkIndividualLinks(entryLinks, thumbnailLinks, Object.assign({}, ...cachedMaps))
+      .catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during marking: ${error.message}`));
   } else {
-    // console.log(`Dynasty-IsRead: ${numLinks} chapters, using hybrid batch fetch`);
     httpGet(listHref).then(responseHtml => {
       // GET the user's Read list (the url is different for each user)
       const listLinks = Array.from(responseHtml.getElementsByClassName('table-link'));
-      const isReadHref = listLinks.find(a => a.innerText === 'Read').href;
-      const toReadHref = listLinks.find(a => a.innerText === 'To Read').href;
-      const fetchIsReadMap = promiseStatusMap(isReadHref);
-      const fetchToReadMap = promiseStatusMap(toReadHref);
+      const promiseStatusObjs = statusMaps.map(statusMap => {
+        const statusHref = listLinks.find(a => a.innerText === statusMap.display);
+        return promiseStatusMap(statusHref).then(table => {
+          return Object.assign({}, statusMap, { table: table });
+        });
+      });
       // Start checking and marking individual chapters while waiting on Read list
       promiseMarkIndividualLinks(
         entryLinks.slice(0, entryThreshold),
         thumbnailLinks.slice(0, entryThreshold),
-        Object.assign({}, cachedToRead, cachedIsRead)
-      ).then(promises => {
-        // const timeDeltaMillis = performance.now() - timeStart;
-        // console.log(`Dynasty-IsRead: finished pre-marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
-      }).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during pre-marking: ${error.message}`));
-      return Promise.all([fetchIsReadMap, fetchToReadMap]);
-    }).then(statusMaps => {
-      const isReadMap = statusMaps[0];
-      const toReadMap = statusMaps[1];
-      localStorage.setItem('isReadMap', JSON.stringify(isReadMap));
-      localStorage.setItem('toReadMap', JSON.stringify(toReadMap));
-      batchMark(isReadMap, statusFormatters.read);
-      batchMark(toReadMap, statusFormatters.to_read);
+        Object.assign({}, ...cachedMaps)
+      ).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during pre-marking: ${error.message}`));
+      return Promise.all(promiseStatusObjs);
+    }).then(statusObjs => {
+      statusObjs.forEach(statusObj => {
+        localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+        batchMark(statusObj.table, statusFormatters[statusObj.status]);
+      });
       return Promise.resolve();
-    }).then(() => {
-      // const timeDeltaMillis = performance.now() - timeStart;
-      // console.log(`Dynasty-IsRead: finished marking ${numLinks} chapters in ${timeDeltaMillis.toFixed()} ms.`);
     }).catch(error => {
       console.log(`Dynasty-IsRead: ${error.name} occurred during batch fetch: ${error.message}`);
     });
