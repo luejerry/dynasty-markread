@@ -15,16 +15,17 @@
 // @include     https://dynasty-scans.com/search*
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
-// @version     2.0
+// @include     https://dynasty-scans.com/lists/*
+// @version     2.1
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // ==/UserScript==
 
 (function () {
-  console.log('Running Dynasty-IsRead user script.');
+  // console.log('Running Dynasty-IsRead user script.');
 
-  const timeStart = performance.now();
+  // const timeStart = performance.now();
 
   const listHref = 'https://dynasty-scans.com/lists';
 
@@ -48,45 +49,43 @@
     });
   };
 
-  /* Check if an individual chapter is Read */
-  const scrapeIsRead = function (htmlDocument) {
+  /* Defines status ids and link formatter functions */
+  const statusFormatters = {
+    read: element => element.style.color = '#999999',
+    to_read: element => element.style.color = '#3a87ad'
+  };
+
+  /* Returns list of statuses of a chapter that match those defined in statusFormatters */
+  const scrapeStatus = function (htmlDocument) {
     const dropList = htmlDocument.getElementById('lists-dropdown').children;
     const readElements = Array.from(dropList)
       .map(e => e.children[0])
-      .filter(a => a.getAttribute('data-type') === 'read')
-      .filter(a => a.getElementsByClassName('icon-remove').length > 0);
-    return readElements.length > 0;
+      .filter(a => statusFormatters.hasOwnProperty(a.getAttribute('data-type')))
+      .filter(a => a.getElementsByClassName('icon-remove').length > 0)
+      .map(a => a.getAttribute('data-type'));
+    return readElements;
   };
 
-  /* Apply style to Read link or caption */
-  const formatIsRead = function (element) {
-    element.style.color = '#999999';
-  };
-
-  /* Check and mark an individual link if Read */
-  const markLinkIsRead = function (a) {
+  /* Mark an individual chapter link if it matches a defined status */
+  const promiseMarkLink = function (a) {
     return httpGet(a.href).then(responseHtml => {
-      if (scrapeIsRead(responseHtml)) {
-        formatIsRead(a);
-      }
+      scrapeStatus(responseHtml).forEach(status => statusFormatters[status](a));
       return Promise.resolve();
     });
   };
 
-  /* Check and mark an individual thumbnail caption if Read */
-  const markThumbnailIsRead = function (a) {
+  /* Mark an individual thumbnail caption if it matches a defined status */
+  const promiseMarkThumbnail = function (a) {
     const titleDiv = a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0];
     return httpGet(a.href).then(responseHtml => {
-      if (scrapeIsRead(responseHtml)) {
-        formatIsRead(titleDiv);
-      }
+      scrapeStatus(responseHtml).forEach(status => statusFormatters[status](titleDiv));
       return Promise.resolve();
     });
   };
 
-  /* Promise to fetch the user's Read list and return it as a lookup table */
-  const promiseIsReadMap = function (isReadHref) {
-    return httpGet(isReadHref).then(responseHtml => {
+  /* Promise to fetch the user's Read list and return it as a lookup table mapping href to boolean */
+  const promiseStatusMap = function (statusHref) {
+    return httpGet(statusHref).then(responseHtml => {
       const isReadList = responseHtml.getElementsByTagName('dd');
       return Array.from(isReadList)
         .map(dd => dd.getElementsByClassName('name')[0])
@@ -98,22 +97,34 @@
   };
 
   /* Promise to individually check and mark all given links and thumbnails that are Read */
-  const promiseMarkIndividualLinks = function (entryLinks, thumbnailLinks) {
-    const markLinkPromises = entryLinks.map(a => markLinkIsRead(a));
-    const markThumbnailPromises = thumbnailLinks.map(a => markThumbnailIsRead(a));
+  const promiseMarkIndividualLinks = function (entryLinks, thumbnailLinks, cachedMap) {
+    const markLinkPromises = entryLinks.filter(a => !cachedMap.hasOwnProperty(a.href))
+      .map(a => promiseMarkLink(a));
+    const markThumbnailPromises = thumbnailLinks.filter(a => !cachedMap.hasOwnProperty(a.href))
+      .map(a => promiseMarkThumbnail(a));
     return Promise.all([...markLinkPromises, ...markThumbnailPromises]);
   };
 
-  /* Mark all links on page that are Read using lookup table */
-  const batchMarkIsRead = function (isReadMap) {
+  /* Batch mark all links on page that exist in the status map, using a provided formatter function */
+  const batchMark = function (statusMap, formatter) {
     entryLinks
-      .filter(a => isReadMap[a.href])
-      .forEach(a => formatIsRead(a));
+      .filter(a => statusMap[a.href])
+      .forEach(a => formatter(a));
     thumbnailLinks
-      .filter(a => isReadMap[a.href])
+      .filter(a => statusMap[a.href])
       .map(a => a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0])
       .filter(div => div !== undefined)
-      .forEach(div => formatIsRead(div));
+      .forEach(div => formatter(div));
+  };
+
+  /* Batch mark all links on page from a cached map in local storage, if it exists */
+  const markFromCache = function (statusMapId, formatter) {
+    const cachedMap = JSON.parse(localStorage.getItem(statusMapId));
+    if (cachedMap) {
+      batchMark(cachedMap, formatter);
+      return cachedMap;
+    }
+    return {};
   };
 
   /* Main */
@@ -129,11 +140,9 @@
     .filter(a => a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0]);
   const numLinks = entryLinks.length + thumbnailLinks.length;
 
-  // Immediately mark if cached Read list is available
-  const cachedIsReadMap = localStorage.getItem('isReadMap');
-  if (cachedIsReadMap) {
-    batchMarkIsRead(JSON.parse(cachedIsReadMap));
-  }
+  // Immediately mark if cached lists are available
+  const cachedIsRead = markFromCache('isReadMap', statusFormatters.read);
+  const cachedToRead = markFromCache('toReadMap', statusFormatters.to_read);
 
   // Run algorithm based on the number of chapter links found.
   // Below a certain threshold, it is faster to scrape Read status from each individual chapter page.
@@ -141,7 +150,7 @@
   // If above threshold, both methods are used concurrently to improve perceived responsiveness.
   if (numLinks < entryThreshold) {
     // console.log(`Dynasty-IsRead: Less than ${entryThreshold} chapters on page, using serial fetch only`);
-    promiseMarkIndividualLinks(entryLinks, thumbnailLinks).then(promises => {
+    promiseMarkIndividualLinks(entryLinks, thumbnailLinks, Object.assign({}, cachedToRead, cachedIsRead)).then(promises => {
       // const timeDeltaMillis = performance.now() - timeStart;
       // console.log(`Dynasty-IsRead: finished marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
     }).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during marking: ${error.message}`));
@@ -149,18 +158,28 @@
     // console.log(`Dynasty-IsRead: ${numLinks} chapters, using hybrid batch fetch`);
     httpGet(listHref).then(responseHtml => {
       // GET the user's Read list (the url is different for each user)
-      const listLinks = responseHtml.getElementsByClassName('table-link');
-      const isReadHref = Array.from(listLinks).find(a => a.innerText === 'Read').href;
-      const fetchIsReadMap = promiseIsReadMap(isReadHref);
+      const listLinks = Array.from(responseHtml.getElementsByClassName('table-link'));
+      const isReadHref = listLinks.find(a => a.innerText === 'Read').href;
+      const toReadHref = listLinks.find(a => a.innerText === 'To Read').href;
+      const fetchIsReadMap = promiseStatusMap(isReadHref);
+      const fetchToReadMap = promiseStatusMap(toReadHref);
       // Start checking and marking individual chapters while waiting on Read list
-      promiseMarkIndividualLinks(entryLinks.slice(0, entryThreshold), thumbnailLinks.slice(0, entryThreshold)).then(promises => {
+      promiseMarkIndividualLinks(
+        entryLinks.slice(0, entryThreshold),
+        thumbnailLinks.slice(0, entryThreshold),
+        Object.assign({}, cachedToRead, cachedIsRead)
+      ).then(promises => {
         // const timeDeltaMillis = performance.now() - timeStart;
         // console.log(`Dynasty-IsRead: finished pre-marking ${promises.length} chapters in ${timeDeltaMillis.toFixed()} ms.`);
       }).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during pre-marking: ${error.message}`));
-      return fetchIsReadMap;
-    }).then(isReadMap => {
+      return Promise.all([fetchIsReadMap, fetchToReadMap]);
+    }).then(statusMaps => {
+      const isReadMap = statusMaps[0];
+      const toReadMap = statusMaps[1];
       localStorage.setItem('isReadMap', JSON.stringify(isReadMap));
-      batchMarkIsRead(isReadMap);
+      localStorage.setItem('toReadMap', JSON.stringify(toReadMap));
+      batchMark(isReadMap, statusFormatters.read);
+      batchMark(toReadMap, statusFormatters.to_read);
       return Promise.resolve();
     }).then(() => {
       // const timeDeltaMillis = performance.now() - timeStart;
