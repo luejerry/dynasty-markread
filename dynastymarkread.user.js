@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.31
+// @version     2.32
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -199,6 +199,10 @@
     promiseFetchLists(listHref).then(statusObjs => {
       // Add children of Read chapter groupings to the Read table
       const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
+      statusObjs.forEach(statusObj => {
+        batchMark(statusObj.table, statusFormatters[statusObj.status]);
+        localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+      });
       return Promise.all([markReadRecursive(isReadMap.table), ...statusObjs]);
     }).then(statusObjs => {
       // Save fresh caches and remark
@@ -206,9 +210,10 @@
         .filter(statusObj => statusObj) // skip null elements
         .forEach(statusObj => {
           localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
-          batchMark(statusObj.table, statusFormatters[statusObj.status]);
         });
       localStorage.removeItem('cache_invalid');
+      const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
+      batchMark(isReadMap.table, statusFormatters[isReadMap.status]);
       // console.log('Dynasty-IsRead: cache refreshed');
       return Promise.resolve();
     }).catch(error => {
