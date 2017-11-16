@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.3
+// @version     2.31
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -73,13 +73,12 @@
     subscribed: element => element.style.color = '#ad1457'
   };
 
+  /* Get elements in Lists dropdown on the given document */
   const getDropList = function (htmlDocument) {
     const dropListParent = htmlDocument.getElementById('lists-dropdown');
-    if (!dropListParent) {
-      return [];
-    }
     return dropListParent ?
-      Array.from(dropListParent.children).map(e => e.children[0])
+      Array.from(dropListParent.children)
+        .map(e => e.children[0])
         .filter(a => statusFormatters.hasOwnProperty(a.getAttribute('data-type'))) :
       [];
   };
@@ -127,7 +126,7 @@
     dropList.forEach(a => {
       a.addEventListener('click', () => {
         localStorage.setItem('cache_invalid', '1');
-        console.log('cache invalidated');
+        // console.log('cache invalidated');
       });
     });
   };
@@ -157,7 +156,8 @@
     return Promise.all(linksObjPromises).then(linksObjs => {
       linksObjs.forEach(linksObj => {
         const {entryLinks, thumbnailLinks} = linksObj;
-        [...entryLinks, ...thumbnailLinks].map(a => a.href)
+        [...entryLinks, ...thumbnailLinks]
+          .map(a => a.href)
           .forEach(href => isReadMap[href] = true);
       });
       return Promise.resolve();
@@ -202,10 +202,12 @@
       return Promise.all([markReadRecursive(isReadMap.table), ...statusObjs]);
     }).then(statusObjs => {
       // Save fresh caches and remark
-      statusObjs.filter(statusObj => statusObj).forEach(statusObj => {
-        localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
-        batchMark(statusObj.table, statusFormatters[statusObj.status]);
-      });
+      statusObjs
+        .filter(statusObj => statusObj) // skip null elements
+        .forEach(statusObj => {
+          localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+          batchMark(statusObj.table, statusFormatters[statusObj.status]);
+        });
       localStorage.removeItem('cache_invalid');
       // console.log('Dynasty-IsRead: cache refreshed');
       return Promise.resolve();
