@@ -3,6 +3,8 @@
 This userscript visually marks chapters in your Read and To Read lists on all site views.
 
 ## Changelog
+* 2.3: chapters can now inherit Read status from their parent groupings.
+    * Mechanism for cache reloading has changed. To force a cache reload, remove or add an item from a list using the list drop down, then navigate to the front page or any chapter list.
 * 2.2: Subscribed items now marked in red.
 * 2.1: now enabled for list views. Chapters on To Read list now marked in blue.
 * 2.0: implement caching for significant performance improvement and removed perf logging.

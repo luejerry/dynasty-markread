@@ -3,7 +3,7 @@
 // @author      cyricc
 // @description Mark chapters that you have already read in Dynasty Scans chapter lists.
 // @namespace   https://dynasty-scans.com
-// @include     https://dynasty-scans.com/chapters/added*
+// @include     https://dynasty-scans.com/chapters/*
 // @include     https://dynasty-scans.com/tags/*
 // @include     https://dynasty-scans.com/issues/*
 // @include     https://dynasty-scans.com/doujins/*
@@ -16,21 +16,16 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.2
+// @version     2.3
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // ==/UserScript==
 
 (function () {
-  // console.log('Running Dynasty-IsRead user script.');
 
-  // const timeStart = performance.now();
-
+  const dynastyHref = 'https://dynasty-scans.com';
   const listHref = 'https://dynasty-scans.com/lists';
-
-  /* Minimum number of chapters on page needed to trigger a batch fetch */
-  const entryThreshold = 30;
 
   /* Promisify XMLHttpRequest */
   const httpGet = function (url) {
@@ -78,32 +73,15 @@
     subscribed: element => element.style.color = '#ad1457'
   };
 
-  /* Returns list of statuses of a chapter that match those defined in statusFormatters */
-  const scrapeStatus = function (htmlDocument) {
-    const dropList = htmlDocument.getElementById('lists-dropdown').children;
-    const readElements = Array.from(dropList)
-      .map(e => e.children[0])
-      .filter(a => statusFormatters.hasOwnProperty(a.getAttribute('data-type')))
-      .filter(a => a.getElementsByClassName('icon-remove').length > 0)
-      .map(a => a.getAttribute('data-type'));
-    return readElements;
-  };
-
-  /* Mark an individual chapter link if it matches a defined status */
-  const promiseMarkLink = function (a) {
-    return httpGet(a.href).then(responseHtml => {
-      scrapeStatus(responseHtml).forEach(status => statusFormatters[status](a));
-      return Promise.resolve();
-    });
-  };
-
-  /* Mark an individual thumbnail caption if it matches a defined status */
-  const promiseMarkThumbnail = function (a) {
-    const titleDiv = a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0];
-    return httpGet(a.href).then(responseHtml => {
-      scrapeStatus(responseHtml).forEach(status => statusFormatters[status](titleDiv));
-      return Promise.resolve();
-    });
+  const getDropList = function (htmlDocument) {
+    const dropListParent = htmlDocument.getElementById('lists-dropdown');
+    if (!dropListParent) {
+      return [];
+    }
+    return dropListParent ?
+      Array.from(dropListParent.children).map(e => e.children[0])
+        .filter(a => statusFormatters.hasOwnProperty(a.getAttribute('data-type'))) :
+      [];
   };
 
   /* Promise to fetch the user's Read list and return it as a lookup table mapping href to boolean */
@@ -117,15 +95,6 @@
           acc[a.href] = true; return acc;
         }, {});
     });
-  };
-
-  /* Promise to individually check and mark all given links and thumbnails that are Read */
-  const promiseMarkIndividualLinks = function (entryLinks, thumbnailLinks, cachedMap) {
-    const markLinkPromises = entryLinks.filter(a => !cachedMap.hasOwnProperty(a.href))
-      .map(a => promiseMarkLink(a));
-    const markThumbnailPromises = thumbnailLinks.filter(a => !cachedMap.hasOwnProperty(a.href))
-      .map(a => promiseMarkThumbnail(a));
-    return Promise.all([...markLinkPromises, ...markThumbnailPromises]);
   };
 
   /* Batch mark all links on page that exist in the status map, using a provided formatter function */
@@ -152,30 +121,20 @@
     });
   };
 
-  /* Main */
+  /* Invalidate caches when user adds/removes an item from the list dropdown */
+  const attachInvalidationListeners = function () {
+    const dropList = getDropList(document);
+    dropList.forEach(a => {
+      a.addEventListener('click', () => {
+        localStorage.setItem('cache_invalid', '1');
+        console.log('cache invalidated');
+      });
+    });
+  };
 
-  // Find all links to chapters on the page
-  const entryList = document.getElementsByTagName('dd');
-  const entryLinks = Array.from(entryList)
-    .map(dd => dd.getElementsByClassName('name')[0])
-    .filter(a => a !== undefined);
-  const thumbnailList = Array.from(document.getElementsByClassName('thumbnail'));
-  const thumbnailLinks = thumbnailList
-    .filter(e => e.tagName === 'A')
-    .filter(a => a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0]);
-  const numLinks = entryLinks.length + thumbnailLinks.length;
-
-  const cachedMaps = markAllFromCache(statusMaps);
-
-  // Run algorithm based on the number of chapter links found.
-  // Below a certain threshold, it is faster to scrape Read status from each individual chapter page.
-  // Above that threshold, it is faster to request the user's entire Read list.
-  // If above threshold, both methods are used concurrently to improve perceived responsiveness.
-  if (numLinks < entryThreshold) {
-    promiseMarkIndividualLinks(entryLinks, thumbnailLinks, Object.assign({}, ...cachedMaps))
-      .catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during marking: ${error.message}`));
-  } else {
-    httpGet(listHref).then(responseHtml => {
+  /* Promise to fetch all of a user's lists that are defined in statusMap */
+  const promiseFetchLists = function (listPageHref) {
+    return httpGet(listPageHref).then(responseHtml => {
       // GET the user's Read list (the url is different for each user)
       const listLinks = Array.from(responseHtml.getElementsByClassName('table-link'));
       const promiseStatusObjs = statusMaps.map(statusMap => {
@@ -184,21 +143,76 @@
           return Object.assign({}, statusMap, { table: table });
         });
       });
-      // Start checking and marking individual chapters while waiting on Read list
-      promiseMarkIndividualLinks(
-        entryLinks.slice(0, entryThreshold),
-        thumbnailLinks.slice(0, entryThreshold),
-        Object.assign({}, ...cachedMaps)
-      ).catch(error => console.log(`Dynasty-IsRead: ${error.name} occurred during pre-marking: ${error.message}`));
       return Promise.all(promiseStatusObjs);
+    });
+  };
+
+  /* Add children of entries marked Read to the Read table */
+  const markReadRecursive = function (isReadMap) {
+    const linksObjPromises = Object.keys(isReadMap)
+      .filter(href =>
+        href.includes('/series/', dynastyHref.length) ||
+        href.includes('/anthologies/', dynastyHref.length))
+      .map(href => promiseScrapeLinks(href));
+    return Promise.all(linksObjPromises).then(linksObjs => {
+      linksObjs.forEach(linksObj => {
+        const {entryLinks, thumbnailLinks} = linksObj;
+        [...entryLinks, ...thumbnailLinks].map(a => a.href)
+          .forEach(href => isReadMap[href] = true);
+      });
+      return Promise.resolve();
+    }).catch(error => Promise.reject(error));
+  };
+
+  /* Scrape all chapter and thumbnail link elements on the given document */
+  const getChapterLinks = function (htmlDocument) {
+    const entryList = htmlDocument.getElementsByTagName('dd');
+    const entryLinks = Array.from(entryList)
+      .map(dd => dd.getElementsByClassName('name')[0])
+      .filter(a => a !== undefined);
+    const thumbnailList = Array.from(htmlDocument.getElementsByClassName('thumbnail'));
+    const thumbnailLinks = thumbnailList
+      .filter(e => e.tagName === 'A')
+      .filter(a => a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0]);
+    return {
+      entryLinks: entryLinks,
+      thumbnailLinks: thumbnailLinks
+    };
+  };
+
+  /* Promise to scrape chapter and thumbnail link elements from a given URL */
+  const promiseScrapeLinks = function (seriesPageHref) {
+    return httpGet(seriesPageHref).then(responseHtml => getChapterLinks(responseHtml));
+  };
+
+  /* Main */
+
+  // Find all links to chapters on the page
+  const {entryLinks, thumbnailLinks} = getChapterLinks(document);
+
+  markAllFromCache(statusMaps);
+
+  const cacheInvalid = localStorage.getItem('cache_invalid');
+
+  if (cacheInvalid) {
+    // console.log('Dynasty-IsRead: cache invalidated: refreshing cache');
+    promiseFetchLists(listHref).then(statusObjs => {
+      // Add children of Read chapter groupings to the Read table
+      const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
+      return Promise.all([markReadRecursive(isReadMap.table), ...statusObjs]);
     }).then(statusObjs => {
-      statusObjs.forEach(statusObj => {
+      // Save fresh caches and remark
+      statusObjs.filter(statusObj => statusObj).forEach(statusObj => {
         localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
         batchMark(statusObj.table, statusFormatters[statusObj.status]);
       });
+      localStorage.removeItem('cache_invalid');
+      // console.log('Dynasty-IsRead: cache refreshed');
       return Promise.resolve();
     }).catch(error => {
       console.log(`Dynasty-IsRead: ${error.name} occurred during batch fetch: ${error.message}`);
     });
   }
+
+  attachInvalidationListeners();
 })();
