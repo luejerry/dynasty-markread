@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.32
+// @version     2.33
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -50,28 +50,24 @@
       id: 'isReadMap',
       status: 'read',
       display: 'Read',
-      table: {}
+      table: {},
+      formatter: element => element.style.color = '#999999'
     },
     {
       id: 'toReadMap',
       status: 'to_read',
       display: 'To Read',
-      table: {}
+      table: {},
+      formatter: element => element.style.color = '#3a87ad'
     },
     {
       id: 'subscribedMap',
       status: 'subscribed',
       display: 'Subscribed',
-      table: {}
+      table: {},
+      formatter: element => element.style.color = '#ad1457'
     }
   ];
-
-  /* Defines status ids and link formatter functions */
-  const statusFormatters = {
-    read: element => element.style.color = '#999999',
-    to_read: element => element.style.color = '#3a87ad',
-    subscribed: element => element.style.color = '#ad1457'
-  };
 
   /* Get elements in Lists dropdown on the given document */
   const getDropList = function (htmlDocument) {
@@ -79,7 +75,8 @@
     return dropListParent ?
       Array.from(dropListParent.children)
         .map(e => e.children[0])
-        .filter(a => statusFormatters.hasOwnProperty(a.getAttribute('data-type'))) :
+        .filter(a => statusMaps.find(statusObj =>
+          statusObj.status === a.getAttribute('data-type'))) :
       [];
   };
 
@@ -113,7 +110,7 @@
     return statusObjs.map(statusObj => {
       const cachedMap = JSON.parse(localStorage.getItem(statusObj.id));
       if (cachedMap) {
-        batchMark(cachedMap, statusFormatters[statusObj.status]);
+        batchMark(cachedMap, statusObj.formatter);
         return cachedMap;
       }
       return {};
@@ -200,20 +197,19 @@
       // Add children of Read chapter groupings to the Read table
       const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
       statusObjs.forEach(statusObj => {
-        batchMark(statusObj.table, statusFormatters[statusObj.status]);
+        batchMark(statusObj.table, statusObj.formatter);
         localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
       });
       return Promise.all([markReadRecursive(isReadMap.table), ...statusObjs]);
-    }).then(statusObjs => {
+    }).then(result => {
       // Save fresh caches and remark
-      statusObjs
-        .filter(statusObj => statusObj) // skip null elements
-        .forEach(statusObj => {
-          localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
-        });
+      const statusObjs = result.filter(statusObj => statusObj); // skip null elements
+      statusObjs.forEach(statusObj => {
+        localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+      });
       localStorage.removeItem('cache_invalid');
       const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
-      batchMark(isReadMap.table, statusFormatters[isReadMap.status]);
+      batchMark(isReadMap.table, isReadMap.formatter);
       // console.log('Dynasty-IsRead: cache refreshed');
       return Promise.resolve();
     }).catch(error => {
