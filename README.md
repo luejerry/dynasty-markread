@@ -2,7 +2,18 @@
 
 This userscript visually marks chapters in your Read and To Read lists on all site views.
 
+## Compatibility note
+Since version 2.4, an updated browser with support for [async-await](https://caniuse.com/#feat=async-functions) is required. Your browser must be at the following versions or newer:
+
+| Browser | Version | Released |
+|----|----|----|
+| Firefox | 52 | Mar 6, 2017 |
+| Chrome | 55 | Nov 30, 2016 |
+| Safari | 10.1 | Mar 26, 2017 |
+| Edge | 15 | Apr 10, 2017 |
+
 ## Changelog
+* 2.4: slight performance improvement. Refactored to use ES8 async-await.
 * 2.3: chapters can now inherit Read status from their parent groupings.
     * Mechanism for cache reloading has changed. To force a cache reload, remove or add an item from a list using the list drop down, then navigate to the front page or any chapter list.
 * 2.2: Subscribed items now marked in red.

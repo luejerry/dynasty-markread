@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.33
+// @version     2.4
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -81,16 +81,14 @@
   };
 
   /* Promise to fetch the user's Read list and return it as a lookup table mapping href to boolean */
-  const promiseStatusMap = function (statusHref) {
-    return httpGet(statusHref).then(responseHtml => {
-      const isReadList = responseHtml.getElementsByTagName('dd');
-      return Array.from(isReadList)
-        .map(dd => dd.getElementsByClassName('name')[0])
-        .filter(a => a !== undefined)
-        .reduce((acc, a) => {
-          acc[a.href] = true; return acc;
-        }, {});
-    });
+  const promiseStatusMap = async function (statusHref) {
+    const isReadList = (await httpGet(statusHref)).getElementsByTagName('dd');
+    return Array.from(isReadList)
+      .map(dd => dd.getElementsByClassName('name')[0])
+      .filter(a => a !== undefined)
+      .reduce((acc, a) => {
+        acc[a.href] = true; return acc;
+      }, {});
   };
 
   /* Batch mark all links on page that exist in the status map, using a provided formatter function */
@@ -129,36 +127,32 @@
   };
 
   /* Promise to fetch all of a user's lists that are defined in statusMap */
-  const promiseFetchLists = function (listPageHref) {
-    return httpGet(listPageHref).then(responseHtml => {
-      // GET the user's Read list (the url is different for each user)
-      const listLinks = Array.from(responseHtml.getElementsByClassName('table-link'));
-      const promiseStatusObjs = statusMaps.map(statusMap => {
-        const statusHref = listLinks.find(a => a.innerText === statusMap.display);
-        return promiseStatusMap(statusHref).then(table => {
-          return Object.assign({}, statusMap, { table: table });
-        });
+  const promiseFetchLists = async function (listPageHref) {
+    // GET the user's Read list (the url is different for each user)
+    const listLinks = Array.from((await httpGet(listPageHref)).getElementsByClassName('table-link'));
+    const promiseStatusObjs = statusMaps.map(statusMap => {
+      const statusHref = listLinks.find(a => a.innerText === statusMap.display);
+      return promiseStatusMap(statusHref).then(table => {
+        return Object.assign({}, statusMap, { table: table });
       });
-      return Promise.all(promiseStatusObjs);
     });
+    return Promise.all(promiseStatusObjs);
   };
 
   /* Add children of entries marked Read to the Read table */
-  const markReadRecursive = function (isReadMap) {
+  const markReadRecursive = async function (isReadMap) {
     const linksObjPromises = Object.keys(isReadMap)
       .filter(href =>
         href.includes('/series/', dynastyHref.length) ||
         href.includes('/anthologies/', dynastyHref.length))
       .map(href => promiseScrapeLinks(href));
-    return Promise.all(linksObjPromises).then(linksObjs => {
-      linksObjs.forEach(linksObj => {
-        const {entryLinks, thumbnailLinks} = linksObj;
-        [...entryLinks, ...thumbnailLinks]
-          .map(a => a.href)
-          .forEach(href => isReadMap[href] = true);
-      });
-      return Promise.resolve();
-    }).catch(error => Promise.reject(error));
+    (await Promise.all(linksObjPromises)).forEach(linksObj => {
+      const {entryLinks, thumbnailLinks} = linksObj;
+      [...entryLinks, ...thumbnailLinks]
+        .map(a => a.href)
+        .forEach(href => isReadMap[href] = true);
+    });
+    return Promise.resolve();
   };
 
   /* Scrape all chapter and thumbnail link elements on the given document */
@@ -178,9 +172,25 @@
   };
 
   /* Promise to scrape chapter and thumbnail link elements from a given URL */
-  const promiseScrapeLinks = function (seriesPageHref) {
-    return httpGet(seriesPageHref).then(responseHtml => getChapterLinks(responseHtml));
+  const promiseScrapeLinks = async function (seriesPageHref) {
+    return getChapterLinks(await httpGet(seriesPageHref));
   };
+
+  /* Promise to reload cache and mark all chapters */
+  const promiseFetchMarkAll = async function () {
+    const statusObjs = await promiseFetchLists(listHref);
+    const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
+    statusObjs.forEach(statusObj => {
+      batchMark(statusObj.table, statusObj.formatter);
+      localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+    });
+    await markReadRecursive(isReadMap.table);
+    statusObjs.forEach(statusObj =>
+      localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table)));
+    localStorage.removeItem('cache_invalid');
+    batchMark(isReadMap.table, isReadMap.formatter);
+  };
+
 
   /* Main */
 
@@ -192,28 +202,8 @@
   const cacheInvalid = localStorage.getItem('cache_invalid');
 
   if (cacheInvalid) {
-    // console.log('Dynasty-IsRead: cache invalidated: refreshing cache');
-    promiseFetchLists(listHref).then(statusObjs => {
-      // Add children of Read chapter groupings to the Read table
-      const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
-      statusObjs.forEach(statusObj => {
-        batchMark(statusObj.table, statusObj.formatter);
-        localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
-      });
-      return Promise.all([markReadRecursive(isReadMap.table), ...statusObjs]);
-    }).then(result => {
-      // Save fresh caches and remark
-      const statusObjs = result.filter(statusObj => statusObj); // skip null elements
-      statusObjs.forEach(statusObj => {
-        localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
-      });
-      localStorage.removeItem('cache_invalid');
-      const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
-      batchMark(isReadMap.table, isReadMap.formatter);
-      // console.log('Dynasty-IsRead: cache refreshed');
-      return Promise.resolve();
-    }).catch(error => {
-      console.log(`Dynasty-IsRead: ${error.name} occurred during batch fetch: ${error.message}`);
+    promiseFetchMarkAll().catch(error => {
+      console.log(`Dynasty-IsRead: ${error.name} occurred during cache refresh: ${error.message}`);
     });
   }
 
