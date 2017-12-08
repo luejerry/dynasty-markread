@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        Dynasty Mark IsRead
+// @name        Dynasty Mark IsRead (legacy)
 // @author      cyricc
 // @description Mark chapters that you have already read in Dynasty Scans chapter lists.
 // @namespace   https://dynasty-scans.com
@@ -18,8 +18,8 @@
 // @include     https://dynasty-scans.com/lists/*
 // @version     2.33
 // @grant       none
-// @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
-// @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
+// @downloadURL https://github.com/luejerry/dynasty-markread/raw/legacy/dynastymarkread.user.js
+// @updateURL   https://github.com/luejerry/dynasty-markread/raw/legacy/dynastymarkread.user.js
 // ==/UserScript==
 
 (function () {
