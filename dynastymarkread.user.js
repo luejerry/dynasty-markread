@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.40
+// @version     2.41
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -129,12 +129,11 @@
   /* Promise to fetch all of a user's lists that are defined in statusMap */
   const promiseFetchLists = async function (listPageHref) {
     // GET the user's Read list (the url is different for each user)
-    const listLinks = Array.from((await httpGet(listPageHref)).getElementsByClassName('table-link'));
-    const promiseStatusObjs = statusMaps.map(statusMap => {
+    const listLinks = Array.from(
+      (await httpGet(listPageHref)).getElementsByClassName('table-link'));
+    const promiseStatusObjs = statusMaps.map(async statusMap => {
       const statusHref = listLinks.find(a => a.innerText === statusMap.display);
-      return promiseStatusMap(statusHref).then(table => {
-        return Object.assign({}, statusMap, { table: table });
-      });
+      return Object.assign({}, statusMap, { table: await promiseStatusMap(statusHref) });
     });
     return Promise.all(promiseStatusObjs);
   };
@@ -145,13 +144,14 @@
       .filter(href =>
         href.includes('/series/', dynastyHref.length) ||
         href.includes('/anthologies/', dynastyHref.length))
-      .map(href => promiseScrapeLinks(href));
-    (await Promise.all(linksObjPromises)).forEach(linksObj => {
-      const {entryLinks, thumbnailLinks} = linksObj;
-      [...entryLinks, ...thumbnailLinks]
-        .map(a => a.href)
-        .forEach(href => isReadMap[href] = true);
-    });
+      .map(async href => {
+        const { entryLinks, thumbnailLinks } = await promiseScrapeLinks(href);
+        [...entryLinks, ...thumbnailLinks]
+          .map(a => a.href)
+          .forEach(linkHref => isReadMap[linkHref] = true);
+        return Promise.resolve();
+      });
+    await Promise.all(linksObjPromises);
     return Promise.resolve();
   };
 
