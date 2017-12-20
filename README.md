@@ -15,6 +15,7 @@ Since version 2.4, an updated browser with support for [ES8 async-await](https:/
 If you wish to use this script with an unsupported browser version, remove the current version of the script and install the [**legacy**](https://github.com/luejerry/dynasty-markread/raw/legacy/dynastymarkread.user.js) version. The legacy script requires only ES6 support and will receive no further updates.
 
 ## Changelog
+* 2.42: cache now guaranteed to refresh at least every 24 hours.
 * 2.4: slight performance improvement. Refactored to use ES8 async-await.
 * 2.3: chapters can now inherit Read status from their parent groupings.
     * Mechanism for cache reloading has changed. To force a cache reload, remove or add an item from a list using the list drop down, then navigate to the front page or any chapter list.
