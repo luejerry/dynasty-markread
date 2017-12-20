@@ -26,6 +26,7 @@
 
   const dynastyHref = 'https://dynasty-scans.com';
   const listHref = 'https://dynasty-scans.com/lists';
+  const cacheExpiryTime = 24 * 3600 * 1000; // 24 hours in milliseconds
 
   /* Promisify XMLHttpRequest */
   const httpGet = function (url) {
@@ -120,7 +121,7 @@
     const dropList = getDropList(document);
     dropList.forEach(a => {
       a.addEventListener('click', () => {
-        localStorage.setItem('cache_invalid', '1');
+        localStorage.setItem('markread_cache_invalid', '1');
         // console.log('cache invalidated');
       });
     });
@@ -187,8 +188,18 @@
     await markReadRecursive(isReadMap.table);
     statusObjs.forEach(statusObj =>
       localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table)));
-    localStorage.removeItem('cache_invalid');
+    localStorage.removeItem('markread_cache_invalid');
+    localStorage.setItem('markread_time_refreshed', Date.now());
     batchMark(isReadMap.table, isReadMap.formatter);
+  };
+
+  /* Check if cache expiry date has elapsed since last refresh */
+  const isCacheExpired = function () {
+    const lastTimeValid = parseInt(localStorage.getItem('markread_time_refreshed'), 10);
+    if (isNaN(lastTimeValid)) {
+      return true;
+    }
+    return Date.now() - lastTimeValid > cacheExpiryTime;
   };
 
 
@@ -199,9 +210,10 @@
 
   markAllFromCache(statusMaps);
 
-  const cacheInvalid = localStorage.getItem('cache_invalid');
+  const cacheInvalid = localStorage.getItem('markread_cache_invalid') || isCacheExpired();
 
   if (cacheInvalid) {
+    console.log('Dynasty-IsRead: cache invalidated');
     promiseFetchMarkAll().catch(error => {
       console.log(`Dynasty-IsRead: ${error.name} occurred during cache refresh: ${error.message}`);
     });
