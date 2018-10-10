@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.42
+// @version     2.50
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -33,7 +33,7 @@
     return new Promise((resolve, reject) => {
       const xhttp = new XMLHttpRequest();
       xhttp.onload = () => {
-        if (xhttp.status == 200) {
+        if (xhttp.status === 200) {
           resolve(xhttp.responseXML);
         } else {
           reject(Error(xhttp.statusText));
@@ -45,12 +45,24 @@
     });
   };
 
+  /* Hook a callback function into AJAX responses sent to the page */
+  const addAjaxHook = function (handler) {
+    const open = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function (method, url, async, user, pass) {
+      this.addEventListener('load', (xmlHttpRequest => progressEvent => {
+        handler(xmlHttpRequest, progressEvent);
+      })(this));
+      open.call(this, method, url, true, user, pass);
+    };
+  };
+
   /* Defines statuses to mark. `status` and `display` fields must match identifiers on the site */
-  const statusMaps = [
+  let statusMaps = [
     {
       id: 'isReadMap',
       status: 'read',
       display: 'Read',
+      urlPattern: /\/\d+-read\//,
       table: {},
       formatter: element => element.style.color = '#999999'
     },
@@ -58,6 +70,7 @@
       id: 'toReadMap',
       status: 'to_read',
       display: 'To Read',
+      urlPattern: /\/\d+-to-read\//,
       table: {},
       formatter: element => element.style.color = '#3a87ad'
     },
@@ -65,10 +78,31 @@
       id: 'subscribedMap',
       status: 'subscribed',
       display: 'Subscribed',
+      urlPattern: /\/\d+-subscribed\//,
       table: {},
       formatter: element => element.style.color = '#ad1457'
     }
   ];
+
+  /* Hook into list add/remove AJAX events to add/remove chapters from cache immediately */
+  const hookListChanges = function () {
+    statusMaps.forEach(statusObj => {
+      addAjaxHook(xmlHttpRequest => {
+        const responseUrl = xmlHttpRequest.responseURL;
+        if (xmlHttpRequest.status === 200 && statusObj.urlPattern.test(responseUrl)) {
+          const response = JSON.parse(xmlHttpRequest.response);
+          const chapterUrl = location.href.split(/[?#]/)[0];
+          if (response.added) {
+            statusObj.table[chapterUrl] = true;
+            localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+          } else if (response.removed) {
+            statusObj.table[chapterUrl] = false;
+            localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+          }
+        }
+      });
+    });
+  };
 
   /* Get elements in Lists dropdown on the given document */
   const getDropList = function (htmlDocument) {
@@ -110,9 +144,9 @@
       const cachedMap = JSON.parse(localStorage.getItem(statusObj.id));
       if (cachedMap) {
         batchMark(cachedMap, statusObj.formatter);
-        return cachedMap;
+        return Object.assign({}, statusObj, { table: cachedMap });
       }
-      return {};
+      return statusObj;
     });
   };
 
@@ -208,7 +242,9 @@
   // Find all links to chapters on the page
   const {entryLinks, thumbnailLinks} = getChapterLinks(document);
 
-  markAllFromCache(statusMaps);
+  statusMaps = markAllFromCache(statusMaps);
+
+  hookListChanges();
 
   const cacheInvalid = localStorage.getItem('markread_cache_invalid') || isCacheExpired();
 
