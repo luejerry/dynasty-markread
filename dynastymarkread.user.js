@@ -16,10 +16,11 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.50
+// @version     2.60
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
+// @require     https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js
 // ==/UserScript==
 
 (function () {
@@ -55,6 +56,17 @@
       open.call(this, method, url, true, user, pass);
     };
   };
+
+  const setStorageObj = function(key, obj) {
+    const compressed = LZString.compress(JSON.stringify(obj));
+    localStorage.setItem(key, compressed);
+  }
+
+  const getStorageObj = function(key) {
+    const item = localStorage.getItem(key);
+    const decompressed = LZString.decompress(item);
+    return decompressed ? JSON.parse(decompressed) : JSON.parse(item);
+  }
 
   /* Defines statuses to mark. `status` and `display` fields must match identifiers on the site */
   let statusMaps = [
@@ -94,10 +106,10 @@
           const chapterUrl = location.href.split(/[?#]/)[0];
           if (response.added) {
             statusObj.table[chapterUrl] = true;
-            localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+            setStorageObj(statusObj.id, statusObj.table);
           } else if (response.removed) {
             statusObj.table[chapterUrl] = false;
-            localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+            setStorageObj(statusObj.id, statusObj.table);
           }
         }
       });
@@ -141,7 +153,7 @@
   /* Batch mark all links on page from a cached map in local storage, if it exists */
   const markAllFromCache = function (statusObjs) {
     return statusObjs.map(statusObj => {
-      const cachedMap = JSON.parse(localStorage.getItem(statusObj.id));
+      const cachedMap = getStorageObj(statusObj.id);
       if (cachedMap) {
         batchMark(cachedMap, statusObj.formatter);
         return Object.assign({}, statusObj, { table: cachedMap });
@@ -217,11 +229,11 @@
     const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
     statusObjs.forEach(statusObj => {
       batchMark(statusObj.table, statusObj.formatter);
-      localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table));
+      setStorageObj(statusObj.id, statusObj.table);
     });
     await markReadRecursive(isReadMap.table);
     statusObjs.forEach(statusObj =>
-      localStorage.setItem(statusObj.id, JSON.stringify(statusObj.table)));
+      setStorageObj(statusObj.id, statusObj.table));
     localStorage.removeItem('markread_cache_invalid');
     localStorage.setItem('markread_time_refreshed', Date.now());
     batchMark(isReadMap.table, isReadMap.formatter);
