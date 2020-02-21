@@ -16,7 +16,7 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.60
+// @version     2.61
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
@@ -65,7 +65,15 @@
   const getStorageObj = function(key) {
     const item = localStorage.getItem(key);
     const decompressed = LZString.decompress(item);
-    return decompressed ? JSON.parse(decompressed) : JSON.parse(item);
+    if (!decompressed) {
+      try {
+        return JSON.parse(item);
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    }
+    return JSON.parse(decompressed);
   }
 
   /* Defines statuses to mark. `status` and `display` fields must match identifiers on the site */
@@ -157,6 +165,8 @@
       if (cachedMap) {
         batchMark(cachedMap, statusObj.formatter);
         return Object.assign({}, statusObj, { table: cachedMap });
+      } else {
+        localStorage.setItem('markread_cache_invalid', '1');
       }
       return statusObj;
     });
@@ -264,6 +274,7 @@
     console.log('Dynasty-IsRead: cache invalidated');
     promiseFetchMarkAll().catch(error => {
       console.log(`Dynasty-IsRead: ${error.name} occurred during cache refresh: ${error.message}`);
+      console.error(error);
     });
   }
 
