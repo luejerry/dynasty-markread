@@ -16,21 +16,20 @@
 // @include     https://dynasty-scans.com/
 // @include     https://dynasty-scans.com/?*
 // @include     https://dynasty-scans.com/lists/*
-// @version     2.61
+// @version     2.62
 // @grant       none
 // @downloadURL https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @updateURL   https://github.com/luejerry/dynasty-markread/raw/master/dynastymarkread.user.js
 // @require     https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js
 // ==/UserScript==
 
-(function () {
-
+(function() {
   const dynastyHref = 'https://dynasty-scans.com';
   const listHref = 'https://dynasty-scans.com/lists';
   const cacheExpiryTime = 24 * 3600 * 1000; // 24 hours in milliseconds
 
   /* Promisify XMLHttpRequest */
-  const httpGet = function (url) {
+  const httpGet = function(url) {
     return new Promise((resolve, reject) => {
       const xhttp = new XMLHttpRequest();
       xhttp.onload = () => {
@@ -47,34 +46,37 @@
   };
 
   /* Hook a callback function into AJAX responses sent to the page */
-  const addAjaxHook = function (handler) {
+  const addAjaxHook = function(handler) {
     const open = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function (method, url, async, user, pass) {
-      this.addEventListener('load', (xmlHttpRequest => progressEvent => {
-        handler(xmlHttpRequest, progressEvent);
-      })(this));
+    XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+      this.addEventListener(
+        'load',
+        (xmlHttpRequest => progressEvent => {
+          handler(xmlHttpRequest, progressEvent);
+        })(this),
+      );
       open.call(this, method, url, true, user, pass);
     };
   };
 
   const setStorageObj = function(key, obj) {
-    const compressed = LZString.compress(JSON.stringify(obj));
+    const compressed = LZString.compressToUTF16(JSON.stringify(obj));
     localStorage.setItem(key, compressed);
-  }
+  };
 
   const getStorageObj = function(key) {
     const item = localStorage.getItem(key);
-    const decompressed = LZString.decompress(item);
+    const decompressed = LZString.decompressFromUTF16(item);
     if (!decompressed) {
       try {
         return JSON.parse(item);
       } catch (err) {
-        console.error(err);
+        console.log('Dynasty-MarkRead: No valid cache, refreshing')
         return null;
       }
     }
     return JSON.parse(decompressed);
-  }
+  };
 
   /* Defines statuses to mark. `status` and `display` fields must match identifiers on the site */
   let statusMaps = [
@@ -84,7 +86,7 @@
       display: 'Read',
       urlPattern: /\/\d+-read\//,
       table: {},
-      formatter: element => element.style.color = '#999999'
+      formatter: element => (element.style.color = '#999999'),
     },
     {
       id: 'toReadMap',
@@ -92,7 +94,7 @@
       display: 'To Read',
       urlPattern: /\/\d+-to-read\//,
       table: {},
-      formatter: element => element.style.color = '#3a87ad'
+      formatter: element => (element.style.color = '#3a87ad'),
     },
     {
       id: 'subscribedMap',
@@ -100,12 +102,12 @@
       display: 'Subscribed',
       urlPattern: /\/\d+-subscribed\//,
       table: {},
-      formatter: element => element.style.color = '#ad1457'
-    }
+      formatter: element => (element.style.color = '#ad1457'),
+    },
   ];
 
   /* Hook into list add/remove AJAX events to add/remove chapters from cache immediately */
-  const hookListChanges = function () {
+  const hookListChanges = function() {
     statusMaps.forEach(statusObj => {
       addAjaxHook(xmlHttpRequest => {
         const responseUrl = xmlHttpRequest.responseURL;
@@ -125,32 +127,32 @@
   };
 
   /* Get elements in Lists dropdown on the given document */
-  const getDropList = function (htmlDocument) {
+  const getDropList = function(htmlDocument) {
     const dropListParent = htmlDocument.getElementById('lists-dropdown');
-    return dropListParent ?
-      Array.from(dropListParent.children)
-        .map(e => e.children[0])
-        .filter(a => statusMaps.find(statusObj =>
-          statusObj.status === a.getAttribute('data-type'))) :
-      [];
+    return dropListParent
+      ? Array.from(dropListParent.children)
+          .map(e => e.children[0])
+          .filter(a =>
+            statusMaps.find(statusObj => statusObj.status === a.getAttribute('data-type')),
+          )
+      : [];
   };
 
   /* Promise to fetch the user's Read list and return it as a lookup table mapping href to boolean */
-  const promiseStatusMap = async function (statusHref) {
+  const promiseStatusMap = async function(statusHref) {
     const isReadList = (await httpGet(statusHref)).getElementsByTagName('dd');
     return Array.from(isReadList)
       .map(dd => dd.getElementsByClassName('name')[0])
       .filter(a => a !== undefined)
       .reduce((acc, a) => {
-        acc[a.href] = true; return acc;
+        acc[a.href] = true;
+        return acc;
       }, {});
   };
 
   /* Batch mark all links on page that exist in the status map, using a provided formatter function */
-  const batchMark = function (statusMap, formatter) {
-    entryLinks
-      .filter(a => statusMap[a.href])
-      .forEach(a => formatter(a));
+  const batchMark = function(statusMap, formatter) {
+    entryLinks.filter(a => statusMap[a.href]).forEach(a => formatter(a));
     thumbnailLinks
       .filter(a => statusMap[a.href])
       .map(a => a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0])
@@ -159,7 +161,7 @@
   };
 
   /* Batch mark all links on page from a cached map in local storage, if it exists */
-  const markAllFromCache = function (statusObjs) {
+  const markAllFromCache = function(statusObjs) {
     return statusObjs.map(statusObj => {
       const cachedMap = getStorageObj(statusObj.id);
       if (cachedMap) {
@@ -173,7 +175,7 @@
   };
 
   /* Invalidate caches when user adds/removes an item from the list dropdown */
-  const attachInvalidationListeners = function () {
+  const attachInvalidationListeners = function() {
     const dropList = getDropList(document);
     dropList.forEach(a => {
       a.addEventListener('click', () => {
@@ -184,10 +186,11 @@
   };
 
   /* Promise to fetch all of a user's lists that are defined in statusMap */
-  const promiseFetchLists = async function (listPageHref) {
+  const promiseFetchLists = async function(listPageHref) {
     // GET the user's Read list (the url is different for each user)
     const listLinks = Array.from(
-      (await httpGet(listPageHref)).getElementsByClassName('table-link'));
+      (await httpGet(listPageHref)).getElementsByClassName('table-link'),
+    );
     const promiseStatusObjs = statusMaps.map(async statusMap => {
       const statusHref = listLinks.find(a => a.innerText === statusMap.display);
       return Object.assign({}, statusMap, { table: await promiseStatusMap(statusHref) });
@@ -196,16 +199,18 @@
   };
 
   /* Add children of entries marked Read to the Read table */
-  const markReadRecursive = async function (isReadMap) {
+  const markReadRecursive = async function(isReadMap) {
     const linksObjPromises = Object.keys(isReadMap)
-      .filter(href =>
-        href.includes('/series/', dynastyHref.length) ||
-        href.includes('/anthologies/', dynastyHref.length))
+      .filter(
+        href =>
+          href.includes('/series/', dynastyHref.length) ||
+          href.includes('/anthologies/', dynastyHref.length),
+      )
       .map(async href => {
         const { entryLinks, thumbnailLinks } = await promiseScrapeLinks(href);
         [...entryLinks, ...thumbnailLinks]
           .map(a => a.href)
-          .forEach(linkHref => isReadMap[linkHref] = true);
+          .forEach(linkHref => (isReadMap[linkHref] = true));
         return Promise.resolve();
       });
     await Promise.all(linksObjPromises);
@@ -213,7 +218,7 @@
   };
 
   /* Scrape all chapter and thumbnail link elements on the given document */
-  const getChapterLinks = function (htmlDocument) {
+  const getChapterLinks = function(htmlDocument) {
     const entryList = htmlDocument.getElementsByTagName('dd');
     const entryLinks = Array.from(entryList)
       .map(dd => dd.getElementsByClassName('name')[0])
@@ -224,17 +229,17 @@
       .filter(a => a.getElementsByClassName('title')[0] || a.getElementsByClassName('caption')[0]);
     return {
       entryLinks: entryLinks,
-      thumbnailLinks: thumbnailLinks
+      thumbnailLinks: thumbnailLinks,
     };
   };
 
   /* Promise to scrape chapter and thumbnail link elements from a given URL */
-  const promiseScrapeLinks = async function (seriesPageHref) {
+  const promiseScrapeLinks = async function(seriesPageHref) {
     return getChapterLinks(await httpGet(seriesPageHref));
   };
 
   /* Promise to reload cache and mark all chapters */
-  const promiseFetchMarkAll = async function () {
+  const promiseFetchMarkAll = async function() {
     const statusObjs = await promiseFetchLists(listHref);
     const isReadMap = statusObjs.find(statusObj => statusObj.id === 'isReadMap');
     statusObjs.forEach(statusObj => {
@@ -242,15 +247,14 @@
       setStorageObj(statusObj.id, statusObj.table);
     });
     await markReadRecursive(isReadMap.table);
-    statusObjs.forEach(statusObj =>
-      setStorageObj(statusObj.id, statusObj.table));
+    statusObjs.forEach(statusObj => setStorageObj(statusObj.id, statusObj.table));
     localStorage.removeItem('markread_cache_invalid');
     localStorage.setItem('markread_time_refreshed', Date.now());
     batchMark(isReadMap.table, isReadMap.formatter);
   };
 
   /* Check if cache expiry date has elapsed since last refresh */
-  const isCacheExpired = function () {
+  const isCacheExpired = function() {
     const lastTimeValid = parseInt(localStorage.getItem('markread_time_refreshed'), 10);
     if (isNaN(lastTimeValid)) {
       return true;
@@ -258,11 +262,10 @@
     return Date.now() - lastTimeValid > cacheExpiryTime;
   };
 
-
   /* Main */
 
   // Find all links to chapters on the page
-  const {entryLinks, thumbnailLinks} = getChapterLinks(document);
+  const { entryLinks, thumbnailLinks } = getChapterLinks(document);
 
   statusMaps = markAllFromCache(statusMaps);
 
@@ -271,12 +274,14 @@
   const cacheInvalid = localStorage.getItem('markread_cache_invalid') || isCacheExpired();
 
   if (cacheInvalid) {
-    console.log('Dynasty-IsRead: cache invalidated');
-    promiseFetchMarkAll().catch(error => {
-      console.log(`Dynasty-IsRead: ${error.name} occurred during cache refresh: ${error.message}`);
-      console.error(error);
-    });
+    console.log('Dynasty-MarkRead: cache invalidated, refreshing...');
+    promiseFetchMarkAll()
+      .catch(error => {
+        console.log(`Dynasty-MarkRead: ${error.name} occurred during cache refresh`, error);
+      })
+      .then(() => console.log('Dynasty-MarkRead: cache refresh successful'));
   }
 
-  attachInvalidationListeners();
+  // TEMP CHANGE -- only refresh cache once every 24 hours
+  // attachInvalidationListeners();
 })();
