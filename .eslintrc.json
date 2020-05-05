@@ -24,6 +24,7 @@
         "indent": ["warn", 2],
         "no-console": ["warn"],
         "semi": "error",
+        "arrow-parens": ["warn", "as-needed"],
         "no-trailing-spaces": "warn",
         "quotes": ["warn", "single"],
         "eqeqeq": ["warn", "smart"],

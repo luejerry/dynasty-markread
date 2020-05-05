@@ -2,19 +2,8 @@
 
 This userscript visually marks chapters in your Read and To Read lists on all site views.
 
-## Compatibility note
-Since version 2.4, an updated browser with support for [ES8 async-await](https://caniuse.com/#feat=async-functions) is required. Your browser must be at the following versions or newer:
-
-| Browser | Version | Released |
-|----|----|----|
-| Firefox | 52 | Mar 6, 2017 |
-| Chrome | 55 | Nov 30, 2016 |
-| Safari | 10.1 | Mar 26, 2017 |
-| Edge | 15 | Apr 10, 2017 |
-
-If you wish to use this script with an unsupported browser version, remove the current version of the script and install the [**legacy**](https://github.com/luejerry/dynasty-markread/raw/legacy/dynastymarkread.user.js) version. The legacy script requires only ES6 support and will receive no further updates.
-
 ## Changelog
+* 2.70: enabled inheritance for Subscribed and To Read lists. Improved performance of marking children of groupings.
 * 2.60: cache size in browser local storage reduced by ~75%.
 * 2.50: adding/removing a chapter from a list now marks/unmarks immediately.
 * 2.42: cache now guaranteed to refresh at least every 24 hours.
